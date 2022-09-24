@@ -22,12 +22,15 @@
 
       <!-- TODO: Delete navItems, and make new links look good -->
 
-      <draggable class="list-group child" tag="span" v-model="nav" v-bind="dragOptionsParent" :move="onMove" @start="isDragging=true" @end="isDragging=false">
+      <draggable class="list-group parent" tag="span" v-model="nav" v-bind="dragOptionsParent" :move="onMove" @start="isDragging=true" @end="isDragging=false">
         <transition-group class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 p-4" type="transition" :name="'navs'" tag="div">
         
           <!-- Menu -->
           <div class="list-group-item parent" v-for="(subnav, navIndex) in nav" :key="navIndex">
             <i class="fa-regular fa-folder-open"></i> {{ nav[navIndex].title }}
+
+            <br>
+            <button @click="deleteItem(navIndex)" class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500">Delete Menu Item</button>
 
             <h2>New Link</h2>
 
@@ -38,14 +41,14 @@
               </div>
             </div>
 
-            <details>
-              <summary>Open New Link Section</summary>
+            <details :open="nav[navIndex].open ? true : false">
+              <summary @click="nav[navIndex].open = !nav[navIndex].open">Open New Link Section</summary>
 
               <div style="color: red;" :v-if="nav[navIndex].newLink.error.length > 0">
                 {{ nav[navIndex].newLink['error'] }}
               </div>
 
-              <label :for="'linkTitle-'+navIndex">Link Title</label>
+              <label :for="'linkTitle-'+navIndex" ref="firstNewLinkInput">Link Title</label>
               <input :id="'linkTitle-'+navIndex" @keyup.enter="addNewLink(navIndex)" v-model="nav[navIndex].newLink['title']" type="text" class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500">
 
               <label :for="'linkHref-'+navIndex">URL</label>
@@ -58,17 +61,19 @@
               </div>
             </details>
 
-            <draggable class="list-group child" tag="span" v-model="nav[navIndex].links" v-bind="dragOptionsChild" :move="onMove" @start="isDragging=true" @end="isDragging=false">
-              <transition-group type="transition" :name="'nav-list'" tag="ul">
-                <li class="list-group-item" v-for="item in nav[navIndex].links" :key="item.id">
-                  <i class="fa-solid fa-grip-vertical mr-3"></i>
-                  {{item.title}} 
-                  <a :href="item.href" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-base text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:ring focus:ring-gray-300 focus:text-white hover:text-white disabled:opacity-25 transition">Open</a>
-                  <i class="fa-solid fa-trash" @click="deleteLink(navIndex, item.id)"></i>
-                  <!-- <span class="badge">{{item.id}}</span> -->
-                </li>
-              </transition-group>
-            </draggable>
+            <div @click="openNewLinkDetailsIfEmpty(navIndex)">
+              <draggable class="list-group child" tag="span" v-model="nav[navIndex].links" v-bind="dragOptionsChild" :move="onMove" @start="isDragging=true" @end="isDragging=false">
+                <transition-group type="transition" :name="'nav-list'" tag="ul">
+                  <li class="list-group-item" v-for="item in nav[navIndex].links" :key="item.id">
+                    <i class="fa-solid fa-grip-vertical mr-3"></i>
+                    {{item.title}} 
+                    <a :href="item.href" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-base text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:ring focus:ring-gray-300 focus:text-white hover:text-white disabled:opacity-25 transition">Open</a>
+                    <button @click="deleteLink(navIndex, item.id)"><i class="fa-solid fa-trash"></i></button>
+                    <!-- <span class="badge">{{item.id}}</span> -->
+                  </li>
+                </transition-group>
+              </draggable>
+            </div>
           </div>
           <!-- End Menu -->
 
@@ -84,16 +89,6 @@
 
 <script>
 import draggable from "vuedraggable";
-const message = [
-  "vue.draggable",
-  "draggable",
-  "component",
-  "for",
-  "vue.js 2.0",
-  "based",
-  "on",
-  "Sortablejs"
-];
 
 export default {
   name: "hello",
@@ -156,14 +151,10 @@ export default {
           href: "",
           target: true,
           error: ""
-        }
+        },
+        open: false,
       });
       this.newNavItem = "";
-
-      // completely replace the object so view picks it up
-      // this.nav = {
-        // ...this.nav
-      // };
 
     },
     addNewLink(navItemId) {
@@ -178,7 +169,6 @@ export default {
       }
       link.error = "";
 
-      // let title = "entry #" + Math.floor(Math.random() * 99999999);
       let id = this.uuidv4();
       let linkToAdd = {
         title: link.title,
@@ -197,6 +187,20 @@ export default {
         target: true,
         error: ""
       };
+      this.focusNewLinkForm(navItemId);
+    },
+    focusNewLinkForm(i) {
+      // we have to wait for vue to get that last change before we focus
+      var _this = this;
+      setTimeout(function () { 
+        _this.$refs['firstNewLinkInput'][i].focus(); 
+      } , 1);
+    },
+    openNewLinkDetailsIfEmpty(i) {
+      if (this.nav[i].links.length == 0) {
+        this.nav[i].open = true;
+        this.focusNewLinkForm(i);
+      }
     },
     deleteLink(navItemId, linkId) {
       let links = this.nav[navItemId].links;
@@ -206,6 +210,9 @@ export default {
           break;
         }
       }
+    },
+    deleteItem(navItemId) {
+      this.nav.splice(navItemId, 1);
     }
   },
   computed: {
@@ -233,6 +240,7 @@ export default {
         delete item.newLink;
         delete item.id;
         delete item.fixed;
+        delete item.open;
         item.links.forEach((link) => {
           delete link.id;
           delete link.fixed;
@@ -287,11 +295,29 @@ export default {
   margin-bottom: 0;
 }
 
-.list-group ul:empty:after {
-  content: "Add or drag links here";
+.list-group.parent ul:empty:after {
+  content: "Add menu items";
   padding: 15px;
   text-align: center;
   display: block;
+}
+
+.list-group.child ul:empty:before {
+  font-family: "Font Awesome 5 Free"; font-weight: 900;
+  content: "\f055";
+  display: inline-block;
+}
+
+.list-group.child ul:empty:after {
+  content: "Add or drag links here";
+  padding: 15px 15px 15px 5px;
+  display: inline-block;
+}
+
+.list-group.child ul:empty {
+  text-align: center;
+  padding: 10px 10px 10px 30px;
+  cursor: pointer;
 }
 
 .list-group.child ul {
@@ -312,9 +338,5 @@ export default {
 
 .list-group-item.child:last-child {
   margin-bottom: 10px !important;
-}
-
-.list-group-item i {
-  cursor: pointer;
 }
 </style>
